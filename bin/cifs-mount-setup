@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+#####~~~~~ reusable generic components ~~~~~#####
+
+## capture starting working directory and script directory
+DIR_START=$(pwd)
+DIR_SCRIPT=$(cd "$(dirname "${0}")"; pwd)
+
+
+#####~~~~~ project specific components ~~~~~#####
+
+## project scripts stored in <project-root>/bin
+## change working directory to project root
+cd ${DIR_SCRIPT}/..
+DIR_ROOT=$(pwd)
+
+
+#####~~~~~ script specific components ~~~~~#####
+
+## setuid on mount.cifs
+chmod 4755 /usr/sbin/mount.cifs
+
+## make mtab a real file, not a symlink
+if [[ -L /etc/mtab ]]; then
+    if [[ ! -f /etc/mtab.orig ]]; then
+        mv /etc/mtab /etc/mtab.orig
+    fi
+    cp -p /etc/mtab.orig /etc/mtab
+else
+    if [[ ! -f /etc/mtab ]]; then
+        if [[ -f /etc/mtab.orig ]]; then
+            cp -p /etc/mtab.orig /etc/mtab
+        else
+            touch /etc/mtab
+        fi
+    fi
+fi
+
+## add user entries to /etc/fstab
+if [[ ! -f /etc/fstab.orig ]]; then
+    if [[ ! -f /etc/fstab ]]; then
+        touch /etc/fstab
+    fi;
+    cp -p /etc/fstab /etc/fstab.orig
+fi
+cp -p /etc/fstab.orig /etc/fstab
+bin/fstab-entry-append.R /etc/fstab

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+#####~~~~~ reusable generic components ~~~~~#####
+
+## capture starting working directory and script directory
+DIR_START=$(pwd)
+DIR_SCRIPT=$(cd "$(dirname "${0}")"; pwd)
+
+
+#####~~~~~ project specific components ~~~~~#####
+
+## project scripts stored in <project-root>/bin
+## change working directory to project root
+cd ${DIR_SCRIPT}/..
+DIR_ROOT=$(pwd)
+
+
+#####~~~~~ script specific components ~~~~~#####
+
+## capture start time
+echo "Script started at: "$(date)
+
+## source server-playbook config file
+source etc/server-playbook.conf
+
+## install centOS packages
+yum clean all
+yum -y update
+for p in $(cat etc/packages_centOS)
+do
+    yum -y install $(echo "${p}")
+done
+yum -y groupinstall "Development Tools"
+yum clean all
+yum -y update
+yum clean all
+
+## install R packages
+mkdir /usr/lib64/gfortran
+ln -s /usr/lib64/ /usr/lib64/gfortran/modules
+R CMD javareconf
+bin/package-install.R etc/packages_R "${R_SHARED_LIB}" "${R_CRAN_MIRROR}"
+bin/package-verify.R etc/packages_R "${R_SHARED_LIB}"
+R CMD javareconf
+
+## install rstudio server
+wget "${R_RSTUDIO_URL}"
+yum -y install --nogpgcheck $(basename "${R_RSTUDIO_URL}")
+firewall-cmd --permanent --zone=public --add-port=8787/tcp
+firewall-cmd --reload
+rm $(basename "${R_RSTUDIO_URL}")
+mv /etc/pam.d/rstudio /etc/pam.d/rstudio.orig
+ln -s /etc/pam.d/login /etc/pam.d/rstudio
+
+## install shiny server
+wget "${R_SHINY_URL}"
+yum -y install --nogpgcheck $(basename "${R_SHINY_URL}")
+firewall-cmd --permanent --zone=public --add-port=3838/tcp
+firewall-cmd --reload
+rm $(basename "${R_SHINY_URL}")
+
+## link to ODBC config files
+mv /etc/freetds.conf /etc/freetds.conf.orig
+ln -s "${DIR_ROOT}"/etc/freetds.conf /etc/freetds.conf
+ln -s "${DIR_ROOT}"/etc/odbc.ini /etc/odbc.ini
+
+## setup for mounting shares
+bin/cifs-mount-setup
+
+## capture finish time
+echo "Script finished at: "$(date)
